@@ -12,6 +12,9 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Placeholder;
 
 class DepartmentResource extends Resource
 {
@@ -36,80 +39,97 @@ class DepartmentResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make()
+                Section::make()
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                        ->label(__('Nama Departemen'))
-                        ->required()
-                        ->maxLength(100)
-                        ->placeholder('Contoh: Keuangan, SDM, IT')
-                        ->helperText('Maksimal 100 karakter')
-                        ->hintIcon('heroicon-o-information-circle', tooltip: 'Nama resmi departemen')
-                        ->prefixIcon('heroicon-o-building-office')
-                        ->autofocus()
-                        ->columnSpanFull()
-                        ->unique(
-                            table: 'departments',
-                            column: 'name',
-                            ignoreRecord: true
-                        )
-                        ->validationMessages([
-                            'required' => 'Harap isi nama departemen',
-                            'unique' => 'Nama departemen ini sudah digunakan',
-                            'max' => 'Maksimal 100 karakter'
-                        ])
-                        ->extraInputAttributes(['class' => 'text-lg font-medium']),
-                ])
-                ->columns(1)
-                ->heading(
-                    fn ($operation) => str($operation)
-                        ->upper()
-                        ->append(' DEPARTEMEN')
-                        ->toString()
-                )
-                ->extraAttributes(['class' => 'border-2 border-gray-200 rounded-xl p-6'])
-                ->headerActions([
-                    // Tambahkan aksi header jika diperlukan
-                ])
-            ]);
+                        Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('name')
+                                    ->label(__('Nama Departemen'))
+                                    ->required()
+                                    ->maxLength(100)
+                                    ->placeholder('Contoh: Keuangan, SDM, IT')
+                                    ->helperText('Maksimal 100 karakter')
+                                    ->hintIcon('heroicon-o-information-circle', tooltip: 'Nama resmi departemen')
+                                    ->prefixIcon('heroicon-o-building-office')
+                                    ->autofocus()
+                                    ->columnSpanFull()
+                                    ->unique(
+                                        table: 'departments',
+                                        column: 'name',
+                                        ignoreRecord: true
+                                    )
+                                    ->validationMessages([
+                                        'required' => 'Harap isi nama departemen',
+                                        'unique' => 'Nama departemen ini sudah digunakan',
+                                        'max' => 'Maksimal 100 karakter'
+                                    ])
+                                    ->extraInputAttributes(['class' => 'text-lg font-medium']),
+                            ])
+                            ->columnSpan(2),
+                        
+                        Placeholder::make('')
+                            ->content('Pastikan semua kolom wajib (bertanda *) telah terisi')
+                            ->extraAttributes(['class' => 'text-lg text-gray-600 font-medium mt-4']),
+                    ])
+                    ->columns(2)
+                    ->columnSpan(2),
+            ])
+            ->columns(2);
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('department_id')
-                    ->label('ID')
-                    ->sortable()
-                    ->searchable(),
                     
                 Tables\Columns\TextColumn::make('name')
+                    ->label(__('Nama Departemen'))
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable()
+                    ->icon('heroicon-o-building-office')
+                    ->size('')
+                    ->weight(''),
                     
                 Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Dibuat')
+                    ->dateTime('d M Y H:i')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->size(''),
                     
                 Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Diperbarui')
+                    ->dateTime('d M Y H:i')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->size(''),
             ])
             ->filters([
                 //
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                
+                Tables\Actions\DeleteAction::make()
+                    ->tooltip('Hapus departemen')
+                    ->requiresConfirmation()
+                    ->modalDescription('Apakah Anda yakin ingin menghapus departemen ini? Data terkait mungkin terpengaruh.')
+                    ->modalSubmitActionLabel('Ya, Hapus')
+                    ->modalCancelActionLabel('Batal'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Hapus Terpilih')
+                        ->modalDescription('Apakah Anda yakin ingin menghapus data yang dipilih?')
+                        ->modalSubmitActionLabel('Ya, Hapus Semua')
+                        ->modalCancelActionLabel('Batal'),
                 ]),
             ])
+            ->defaultSort('name', 'asc')
             ->emptyStateActions([
                 Tables\Actions\CreateAction::make(),
             ]);

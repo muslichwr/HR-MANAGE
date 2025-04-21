@@ -13,6 +13,11 @@ class Department extends Model
     protected $primaryKey = 'department_id';
     public $incrementing = true;
 
+    protected $casts = [
+        'created_at' => 'datetime:Y-m-d H:i:s',
+        'updated_at' => 'datetime:Y-m-d H:i:s',
+    ];
+
     protected $fillable = ['name'];
 
     public function positions(): HasMany
@@ -27,6 +32,8 @@ class Department extends Model
 
     public function auditLogs()
     {
-        return $this->hasMany(AuditLog::class, 'record_id');
+        return $this->hasMany(AuditLog::class, 'record_id')
+            ->where('table_name', 'departments')
+            ->orderByDesc('created_at');
     }
 }

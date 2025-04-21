@@ -192,19 +192,11 @@ class PositionResource extends Resource
                     ->multiple(),
             ])
             ->actions([
-                Tables\Actions\ViewAction::make()
-                ->label('Lihat Detail')
-                ->iconButton()
-                ->tooltip('Lihat detail jabatan'),
+                Tables\Actions\ViewAction::make(),
 
-                Tables\Actions\EditAction::make()
-                    ->label('Edit')
-                    ->iconButton()
-                    ->tooltip('Ubah data jabatan'),
+                Tables\Actions\EditAction::make(),
 
                 Tables\Actions\DeleteAction::make()
-                    ->label('Hapus')
-                    ->iconButton()
                     ->tooltip('Hapus jabatan')
                     ->requiresConfirmation()
                     ->modalDescription('Apakah Anda yakin ingin menghapus jabatan ini? Data terkait mungkin terpengaruh.')

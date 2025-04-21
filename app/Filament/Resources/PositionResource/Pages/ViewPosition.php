@@ -84,31 +84,33 @@ class ViewPosition extends ViewRecord
                             ]),
                     ]),
 
-                Section::make('Informasi Tambahan')
-                    ->icon('heroicon-o-document-text')
+                    Section::make('Riwayat Sistem')
+                    ->icon('heroicon-o-clock')
                     ->collapsible()
                     ->collapsed()
                     ->schema([
-                        Grid::make(2)
-                            ->schema([
-                                TextEntry::make('created_at')
-                                    ->label('Dibuat Pada')
-                                    ->dateTime('d M Y H:i')
-                                    ->since()
-                                    ->icon('heroicon-o-calendar')
-                                    ->size(TextEntry\TextEntrySize::Medium),
-
-                                TextEntry::make('updated_at')
-                                    ->label('Terakhir Diubah')
-                                    ->dateTime('d M Y H:i')
-                                    ->since()
-                                    ->icon('heroicon-o-document')
-                                    ->size(TextEntry\TextEntrySize::Medium),
-                            ]),
-                    ]),
+                        TextEntry::make('created_at')
+                            ->label('Dibuat Pada')
+                            ->dateTime('l, d F Y H:i')
+                            ->icon('heroicon-o-plus-circle')
+                            ->color('success')
+                            ->size(TextEntry\TextEntrySize::Medium),
+                            
+                        TextEntry::make('updated_at')
+                            ->label('Terakhir Diupdate')
+                            ->since()
+                            ->icon('heroicon-o-arrow-path')
+                            ->color('warning')
+                            ->size(TextEntry\TextEntrySize::Medium)
+                            ->tooltip(fn ($record) => $record->updated_at->format('l, d F Y H:i')),
+                    ])
+                    ->columns(2)
+                    ->description('Catatan waktu pembuatan dan perubahan data')
+                    ->collapsible(),
             ])
             ->columns(1);
     }
+    
 
     protected function getHeaderActions(): array
     {

@@ -39,6 +39,8 @@ class ViewDepartment extends ViewRecord
                 
                 Section::make('Riwayat Sistem')
                     ->icon('heroicon-o-clock')
+                    ->collapsible()
+                    ->collapsed()
                     ->schema([
                         TextEntry::make('created_at')
                             ->label('Dibuat Pada')

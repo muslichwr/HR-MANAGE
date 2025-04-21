@@ -14,78 +14,59 @@ class AuditLogsRelationManager extends RelationManager
 {
     protected static string $relationship = 'auditLogs';
 
-    // public function form(Form $form): Form
-    // {
-    //     return $form
-    //         ->schema([
-    //             Forms\Components\TextInput::make('log_id')
-    //                 ->required()
-    //                 ->maxLength(255),
-    //         ]);
-    // }
+    protected static ?string $title = 'Riwayat Perubahan';
 
     public function table(Table $table): Table
     {
         return $table
-            // ->recordTitleAttribute('log_id')
             ->columns([
-                Tables\Columns\TextColumn::make('created_at')
-                    ->label('Waktu')
-                    ->dateTime('d/m/Y H:i:s')
-                    ->sortable(),
-                    
-                Tables\Columns\TextColumn::make('user.name')
-                    ->label('Pengguna')
-                    ->searchable()
-                    ->sortable(),
-                    
                 Tables\Columns\TextColumn::make('action')
                     ->label('Aksi')
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'create' => 'Dibuat',
+                        'update' => 'Diupdate',
+                        'delete' => 'Dihapus',
+                        default => ucfirst($state)
+                    })
                     ->badge()
-                    ->formatStateUsing(fn ($state) => strtoupper($state))
                     ->color(fn ($state) => match ($state) {
                         'create' => 'success',
                         'update' => 'warning',
                         'delete' => 'danger',
+                        default => 'gray'
                     }),
+                    
+                Tables\Columns\TextColumn::make('user.name')
+                    ->label('User')
+                    ->searchable(),
+                    
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Waktu')
+                    ->dateTime('d/m/Y H:i:s'),
                     
                 Tables\Columns\TextColumn::make('old_value')
                     ->label('Data Lama')
-                    ->formatStateUsing(fn ($state) => collect(json_decode($state, true) ?: [])->map(
-                        fn ($value, $key) => "<b>{$key}:</b> {$value}"
-                    )->join('<br>'))
+                    ->formatStateUsing(fn ($state) => $state ? 
+                        '<pre class="text-xs p-2 rounded">'.json_encode($state, JSON_PRETTY_PRINT).'</pre>' : '-')
                     ->html(),
                     
                 Tables\Columns\TextColumn::make('new_value')
                     ->label('Data Baru')
-                    ->formatStateUsing(fn ($state) => collect(json_decode($state, true) ?: [])->map(
-                        fn ($value, $key) => "<b>{$key}:</b> {$value}"
-                    )->join('<br>'))
+                    ->formatStateUsing(fn ($state) => $state ? 
+                        '<pre class="text-xs p-2  rounded">'.json_encode($state, JSON_PRETTY_PRINT).'</pre>' : '-')
                     ->html(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('action')
-                ->options([
-                    'create' => 'Dibuat',
-                    'update' => 'Diubah',
-                    'delete' => 'Dihapus',
-                ])
+                    ->label('Filter Aksi')
+                    ->options([
+                        'create' => 'Pembuatan',
+                        'update' => 'Update',
+                        'delete' => 'Penghapusan',
+                    ])
             ])
-            ->headerActions([
-                
-            ])
-            ->actions([
-                
-            ])
-            ->bulkActions([
-                
-            ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->actions([])
+            ->bulkActions([]);
     }
-
-    // protected function getTableQuery(): Builder
-    // {
-    //     return parent::getTableQuery()
-    //         ->where('table_name', 'departments');
-    // }
 }
