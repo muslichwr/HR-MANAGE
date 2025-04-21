@@ -24,4 +24,9 @@ class Department extends Model
     {
         return $this->hasMany(Employee::class, 'department_id');
     }
+
+    public function auditLogs()
+    {
+        return $this->hasMany(AuditLog::class, 'record_id');
+    }
 }

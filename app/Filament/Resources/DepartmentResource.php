@@ -19,7 +19,18 @@ class DepartmentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
     protected static ?string $navigationGroup = 'Organization Management';
+    protected static ?string $navigationLabel = 'Departemen';
     protected static ?int $navigationSort = 1;
+
+    public static function getModelLabel(): string
+    {
+        return __('Departemen');
+    }
+
+    public static function getPluralModelLabel(): string
+    {
+        return __('Daftar Departemen');
+    }
 
     public static function form(Form $form): Form
     {
@@ -107,7 +118,7 @@ class DepartmentResource extends Resource
     public static function getRelations(): array
     {
         return [
-            // Tambahkan relasi jika diperlukan
+            RelationManagers\AuditLogsRelationManager::class,
         ];
     }
 

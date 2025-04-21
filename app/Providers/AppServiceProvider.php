@@ -6,6 +6,8 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use App\Models\Department;
+use App\Observers\DepartmentObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -31,7 +33,6 @@ class AppServiceProvider extends ServiceProvider
         Carbon::setLocale('id');
         config(['app.locale' => 'id']);
         
-        // Format waktu default
-
+        Department::observe(DepartmentObserver::class);
     }
 }

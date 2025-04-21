@@ -31,4 +31,14 @@ class AuditLog extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class, 'record_id', 'department_id');
+    }
+
+    // public function scopeForDepartment($query)
+    // {
+    //     return $query->where('table_name', 'departments');
+    // }
 }

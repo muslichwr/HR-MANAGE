@@ -13,7 +13,7 @@ class Position extends Model
 
     protected $primaryKey = 'position_id';
     public $incrementing = true;
-
+    protected $casts = ['level' => 'string'];
     protected $fillable = ['title', 'department_id', 'level'];
 
     public function department(): BelongsTo
