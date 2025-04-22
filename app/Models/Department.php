@@ -5,12 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 
 class Department extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $primaryKey = 'department_id';
+
     public $incrementing = true;
 
     protected $casts = [
@@ -30,10 +34,18 @@ class Department extends Model
         return $this->hasMany(Employee::class, 'department_id');
     }
 
-    public function auditLogs()
+    public function getActivitylogOptions(): LogOptions
     {
-        return $this->hasMany(AuditLog::class, 'record_id')
-            ->where('table_name', 'departments')
-            ->orderByDesc('created_at');
+        return LogOptions::defaults()
+            ->logOnly(['name'])
+            ->logOnlyDirty()
+            ->setDescriptionForEvent(fn(string $eventName) => "Departemen {$eventName}")
+            ->dontSubmitEmptyLogs()
+            ->useLogName('department');
+    }
+    
+    public function activities()
+    {
+        return $this->morphMany(Activity::class, 'subject');
     }
 }
