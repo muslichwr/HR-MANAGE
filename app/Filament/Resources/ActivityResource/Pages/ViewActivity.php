@@ -8,6 +8,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Components\TextEntry;
 use App\Filament\Resources\DepartmentResource;
 use App\Filament\Resources\PositionResource;
+use App\Filament\Resources\EmployeeResource;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\IconEntry;
@@ -84,9 +85,11 @@ class ViewActivity extends ViewRecord
                                     return $record->subject->name ?? '-';
                                 } elseif ($record->log_name === 'position' && $record->subject) {
                                     return $record->subject->title ?? '-';
+                                } elseif ($record->log_name === 'employee' && $record->subject) {
+                                    return $record->subject->full_name ?? '-';
                                 }
                                 
-                                return $record->subject ? ($record->subject->name ?? ($record->subject->title ?? '-')) : '-';
+                                return $record->subject ? ($record->subject->name ?? ($record->subject->title ?? ($record->subject->full_name ?? '-'))) : '-';
                             })
                             ->url(function ($record) {
                                 if (!$record->subject_id) return null;
@@ -94,6 +97,7 @@ class ViewActivity extends ViewRecord
                                 return match($record->subject_type) {
                                     'App\\Models\\Department' => DepartmentResource::getUrl('view', ['record' => $record->subject_id]),
                                     'App\\Models\\Position' => PositionResource::getUrl('view', ['record' => $record->subject_id]),
+                                    'App\\Models\\Employee' => EmployeeResource::getUrl('view', ['record' => $record->subject_id]),
                                     default => null,
                                 };
                             })
@@ -111,6 +115,70 @@ class ViewActivity extends ViewRecord
                     ])
                     ->columns(2)
                     ->collapsible(),
+                
+                Section::make('Detail Karyawan')
+                    ->schema([
+                        TextEntry::make('subject.nik')
+                            ->label('NIK')
+                            ->icon('heroicon-o-identification'),
+                            
+                        TextEntry::make('subject.full_name')
+                            ->label('Nama Lengkap')
+                            ->icon('heroicon-o-user')
+                            ->weight('bold'),
+                            
+                        TextEntry::make('subject.department.name')
+                            ->label('Departemen')
+                            ->icon('heroicon-o-building-office')
+                            ->url(fn ($record) => $record->subject && $record->subject->department_id ? 
+                                   DepartmentResource::getUrl('view', ['record' => $record->subject->department_id]) : null),
+                            
+                        TextEntry::make('subject.position.title')
+                            ->label('Jabatan')
+                            ->icon('heroicon-o-rectangle-stack')
+                            ->url(fn ($record) => $record->subject && $record->subject->position_id ? 
+                                   PositionResource::getUrl('view', ['record' => $record->subject->position_id]) : null),
+                            
+                        TextEntry::make('subject.join_date')
+                            ->label('Tanggal Bergabung')
+                            ->date('d F Y')
+                            ->icon('heroicon-o-calendar'),
+                            
+                        TextEntry::make('subject.status')
+                            ->label('Status')
+                            ->formatStateUsing(fn (string $state) => match ($state) {
+                                'active' => 'Aktif',
+                                'probation' => 'Masa Percobaan',
+                                'contract' => 'Kontrak',
+                                'inactive' => 'Tidak Aktif',
+                                'terminated' => 'Diberhentikan',
+                                default => $state,
+                            })
+                            ->icon(fn (string $state) => match ($state) {
+                                'active' => 'heroicon-o-check-circle',
+                                'probation' => 'heroicon-o-clock',
+                                'contract' => 'heroicon-o-document-text',
+                                'inactive' => 'heroicon-o-x-circle',
+                                'terminated' => 'heroicon-o-no-symbol',
+                                default => 'heroicon-o-question-mark-circle',
+                            })
+                            ->color(fn (string $state) => match ($state) {
+                                'active' => 'success',
+                                'probation' => 'warning',
+                                'contract' => 'info',
+                                'inactive' => 'gray',
+                                'terminated' => 'danger',
+                                default => 'gray',
+                            }),
+                            
+                        TextEntry::make('subject.address')
+                            ->label('Alamat')
+                            ->icon('heroicon-o-home')
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2)
+                    ->collapsible()
+                    ->visible(fn ($record) => $record && isset($record->subject_type) && $record->subject_type === 'App\\Models\\Employee'),
                     
                 Section::make('Perubahan Data')
                     ->schema([

@@ -43,4 +43,5 @@ class Position extends Model
     {
         return $this->morphMany(Activity::class, 'subject');
     }
+
 }

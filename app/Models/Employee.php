@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Models\Activity;
 
 class Employee extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $primaryKey = 'employee_id';
     public $incrementing = true;
@@ -27,6 +30,21 @@ class Employee extends Model
     protected $casts = [
         'join_date' => 'date',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['nik', 'full_name', 'position_id', 'department_id', 'join_date', 'status', 'address'])
+            ->logOnlyDirty()
+            ->setDescriptionForEvent(fn(string $eventName) => "Karyawan {$eventName}")
+            ->dontSubmitEmptyLogs()
+            ->useLogName('employee');
+    }
+    
+    public function activities()
+    {
+        return $this->morphMany(Activity::class, 'subject');
+    }
 
     public function position(): BelongsTo
     {
