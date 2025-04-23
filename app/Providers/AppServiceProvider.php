@@ -25,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
         Filament::serving(function () {
             Filament::registerNavigationGroups([
                 'Organization Management' => 'Manajemen Organisasi',
+                'Payroll Management' => 'Manajemen Gaji',
             ]);
         });
 

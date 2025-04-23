@@ -21,6 +21,8 @@ use Filament\Notifications\Notification;
 use App\Filament\Resources\PositionResource;
 use App\Filament\Resources\DepartmentResource;
 use App\Filament\Resources\EmployeeResource;
+use App\Filament\Resources\ComponentTypeResource;
+use App\Filament\Resources\SalaryComponentResource;
 
 class ActivityResource extends Resource
 {
@@ -61,6 +63,8 @@ class ActivityResource extends Resource
                         'employee' => 'success',
                         'position' => 'info',
                         'user' => 'warning',
+                        'component_type' => 'amber',
+                        'salary_component' => 'violet',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state) => match ($state) {
@@ -68,6 +72,8 @@ class ActivityResource extends Resource
                         'employee' => 'Karyawan',
                         'position' => 'Jabatan',
                         'user' => 'Pengguna',
+                        'component_type' => 'Tipe Komponen',
+                        'salary_component' => 'Komponen Gaji',
                         default => 'Umum',
                     })
                     ->searchable()
@@ -112,6 +118,10 @@ class ActivityResource extends Resource
                         } elseif ($record->log_name === 'employee' && $record->subject) {
                             $employee = $record->subject;
                             return $employee->full_name ?? '-';
+                        } elseif ($record->log_name === 'component_type' && $record->subject) {
+                            return $record->subject->name ?? '-';
+                        } elseif ($record->log_name === 'salary_component' && $record->subject) {
+                            return $record->subject->name ?? '-';
                         }
                         
                         return $record->subject ? ($record->subject->name ?? ($record->subject->title ?? ($record->subject->full_name ?? '-'))) : '-';
@@ -123,6 +133,8 @@ class ActivityResource extends Resource
                             'App\\Models\\Department' => DepartmentResource::getUrl('view', ['record' => $record->subject_id]),
                             'App\\Models\\Position' => PositionResource::getUrl('view', ['record' => $record->subject_id]),
                             'App\\Models\\Employee' => EmployeeResource::getUrl('view', ['record' => $record->subject_id]),
+                            'App\\Models\\ComponentType' => ComponentTypeResource::getUrl('view', ['record' => $record->subject_id]),
+                            'App\\Models\\SalaryComponent' => SalaryComponentResource::getUrl('view', ['record' => $record->subject_id]),
                             default => null,
                         };
                     })
@@ -135,7 +147,9 @@ class ActivityResource extends Resource
                                     'App\\Models\\Department', 
                                     'App\\Models\\Position', 
                                     'App\\Models\\Employee', 
-                                    'App\\Models\\User'
+                                    'App\\Models\\User',
+                                    'App\\Models\\ComponentType',
+                                    'App\\Models\\SalaryComponent'
                                 ], function (Builder $query) use ($search) {
                                     $query->where(function (Builder $query) use ($search) {
                                         $query->where('name', 'like', "%{$search}%")
@@ -234,6 +248,8 @@ class ActivityResource extends Resource
                         'employee' => 'Karyawan',
                         'position' => 'Jabatan',
                         'user' => 'Pengguna',
+                        'component_type' => 'Tipe Komponen',
+                        'salary_component' => 'Komponen Gaji',
                         'default' => 'Umum',
                     ])
                     ->multiple()
@@ -256,6 +272,8 @@ class ActivityResource extends Resource
                         'App\\Models\\Position' => 'Jabatan',
                         'App\\Models\\Employee' => 'Karyawan',
                         'App\\Models\\User' => 'Pengguna',
+                        'App\\Models\\ComponentType' => 'Tipe Komponen',
+                        'App\\Models\\SalaryComponent' => 'Komponen Gaji',
                     ])
                     ->multiple()
                     ->preload(),
