@@ -6,6 +6,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use App\Helpers\PdfHelper;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -14,7 +15,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-
+        // Binding PDF Helper untuk digunakan dengan facade
+        $this->app->singleton('pdf-helper', function ($app) {
+            return new PdfHelper();
+        });
     }
 
     /**
