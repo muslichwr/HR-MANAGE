@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Validation\ValidationException;
 
 class Payslip extends Model
 {
@@ -23,6 +24,95 @@ class Payslip extends Model
         'net_salary',
         'pdf_url'
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($model) {
+            static::validateUniqueConstraint($model);
+            
+            // Pastikan net_salary dihitung dengan benar
+            if ($model->total_earnings !== null && $model->total_deductions !== null) {
+                $model->net_salary = $model->total_earnings - $model->total_deductions;
+            }
+        });
+        
+        static::updating(function ($model) {
+            static::validateUniqueConstraint($model);
+            
+            // Pastikan net_salary dihitung dengan benar jika total pendapatan atau potongan berubah
+            if ($model->isDirty('total_earnings') || $model->isDirty('total_deductions')) {
+                $model->net_salary = $model->total_earnings - $model->total_deductions;
+            }
+        });
+        
+        static::updated(function ($model) {
+            // Pastikan totals berdasarkan komponen selalu akurat setelah update
+            static::recalculateFromComponents($model);
+        });
+    }
+    
+    /**
+     * Memastikan kombinasi employee_id + month + year unik
+     */
+    protected static function validateUniqueConstraint($model): void
+    {
+        $query = static::where('employee_id', $model->employee_id)
+            ->where('month', $model->month)
+            ->where('year', $model->year);
+        
+        if ($model->exists) {
+            $query->where('payslip_id', '!=', $model->payslip_id);
+        }
+        
+        if ($query->exists()) {
+            throw ValidationException::withMessages([
+                'employee_id' => 'Payslip untuk karyawan ini pada periode yang sama sudah ada.'
+            ]);
+        }
+    }
+    
+    /**
+     * Menghitung ulang total berdasarkan komponen-komponen
+     */
+    public static function recalculateFromComponents($model): void
+    {
+        $model->loadMissing(['payslipComponents', 'payslipComponents.component', 'payslipComponents.component.componentType']);
+        
+        $components = $model->payslipComponents;
+        if ($components->isEmpty()) {
+            return;
+        }
+        
+        $totalEarnings = $components
+            ->filter(function ($item) {
+                return $item->component && 
+                    $item->component->componentType && 
+                    $item->component->componentType->name === 'Pendapatan';
+            })
+            ->sum('amount');
+            
+        $totalDeductions = $components
+            ->filter(function ($item) {
+                return $item->component && 
+                    $item->component->componentType && 
+                    $item->component->componentType->name === 'Potongan';
+            })
+            ->sum('amount');
+            
+        $netSalary = $totalEarnings - $totalDeductions;
+        
+        // Update hanya jika ada perubahan
+        if ($model->total_earnings != $totalEarnings || 
+            $model->total_deductions != $totalDeductions ||
+            $model->net_salary != $netSalary) {
+            
+            $model->update([
+                'total_earnings' => $totalEarnings,
+                'total_deductions' => $totalDeductions,
+                'net_salary' => $netSalary,
+            ]);
+        }
+    }
 
     public function employee(): BelongsTo
     {

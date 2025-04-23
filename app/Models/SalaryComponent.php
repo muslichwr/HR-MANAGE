@@ -36,6 +36,7 @@ class SalaryComponent extends Model
         'type_id',
         'name',
         'description',
+        'default_amount'
     ];
 
     public function componentType(): BelongsTo

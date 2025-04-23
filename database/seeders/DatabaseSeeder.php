@@ -19,5 +19,10 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+        
+        // Jalankan seeder untuk sistem payroll
+        $this->call([
+            PayslipSeeder::class,
+        ]);
     }
 }
