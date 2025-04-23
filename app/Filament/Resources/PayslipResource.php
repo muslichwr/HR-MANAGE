@@ -30,7 +30,7 @@ class PayslipResource extends Resource
 {
     protected static ?string $model = Payslip::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+    protected static ?string $navigationIcon = 'fas-file-invoice-dollar';
     protected static ?string $navigationGroup = 'Payroll Management';
     protected static ?string $navigationLabel = 'Slip Gaji';
     protected static ?int $navigationSort = 6;
