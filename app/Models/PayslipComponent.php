@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class PayslipComponent extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $primaryKey = 'payslip_component_id';
     public $incrementing = true;
@@ -20,6 +22,23 @@ class PayslipComponent extends Model
         'component_id',
         'amount'
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['payslip_id', 'component_id', 'amount'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(function(string $eventName) {
+                return match($eventName) {
+                    'created' => 'komponen slip gaji ditambahkan',
+                    'updated' => 'komponen slip gaji diubah',
+                    'deleted' => 'komponen slip gaji dihapus',
+                    default => $eventName
+                };
+            })
+            ->useLogName('payslip_component');
+    }
 
     /**
      * Perintah yang dijalankan saat model sedang diboot

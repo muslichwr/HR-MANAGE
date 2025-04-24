@@ -13,6 +13,8 @@ use Spatie\Activitylog\Models\Activity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
 
 class ListActivities extends ListRecords
 {
@@ -26,13 +28,9 @@ class ListActivities extends ListRecords
                 ->icon('heroicon-o-arrow-path')
                 ->color('gray')
                 ->action(function () {
-                    $this->resetTable();
-                    Notification::make()
-                        ->title('Data diperbarui')
-                        ->success()
-                        ->send();
-                })
-                ->tooltip('Refresh data'),
+                    $this->clearActivityCache();
+                    $this->refreshData();
+                }),
                 
             Actions\Action::make('purge')
                 ->label('Bersihkan Log Lama')
@@ -46,6 +44,8 @@ class ListActivities extends ListRecords
                 ->action(function () {
                     $thirtyDaysAgo = now()->subDays(30);
                     $recordsDeleted = Activity::where('created_at', '<', $thirtyDaysAgo)->delete();
+                    
+                    $this->clearActivityCache();
                     
                     $this->dispatch('notify', [
                         'title' => 'Log dibersihkan!',
@@ -89,5 +89,33 @@ class ListActivities extends ListRecords
     protected function paginateTableQuery(Builder $query): Paginator
     {
         return $query->paginate(25);
+    }
+    
+    protected function getTableRecordsPerPageSelectOptions(): array
+    {
+        return [10, 25, 50, 100];
+    }
+    
+    protected function getTableQuery(): Builder
+    {
+        $query = parent::getTableQuery();
+        
+        if (!empty($this->tableFilters) || $this->tableSearch) {
+            return $query;
+        }
+        
+        return $query->latest('id')->limit(500);
+    }
+    
+    protected function clearActivityCache(): void
+    {
+        Cache::forget('activity_log_count');
+        Cache::forget('activity_log_recent');
+    }
+    
+    public function refreshData(): void
+    {
+        $this->resetTable();
+        $this->dispatch('refresh');
     }
 }

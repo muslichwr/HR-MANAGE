@@ -7,10 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Validation\ValidationException;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Activitylog\LogOptions;
 
 class Payslip extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $primaryKey = 'payslip_id';
     public $incrementing = true;
@@ -24,6 +26,23 @@ class Payslip extends Model
         'net_salary',
         'pdf_url'
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['employee_id', 'month', 'year', 'total_earnings', 'total_deductions', 'net_salary', 'pdf_url'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(function(string $eventName) {
+                return match($eventName) {
+                    'created' => 'slip gaji baru dibuat',
+                    'updated' => 'slip gaji diperbarui',
+                    'deleted' => 'slip gaji dihapus',
+                    default => $eventName
+                };
+            })
+            ->useLogName('payslip');
+    }
 
     protected static function booted()
     {

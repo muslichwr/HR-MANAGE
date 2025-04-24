@@ -23,6 +23,7 @@ use App\Filament\Resources\DepartmentResource;
 use App\Filament\Resources\EmployeeResource;
 use App\Filament\Resources\ComponentTypeResource;
 use App\Filament\Resources\SalaryComponentResource;
+use App\Filament\Resources\PayslipResource;
 
 class ActivityResource extends Resource
 {
@@ -65,6 +66,8 @@ class ActivityResource extends Resource
                         'user' => 'warning',
                         'component_type' => 'amber',
                         'salary_component' => 'violet',
+                        'payslip' => 'emerald',
+                        'payslip_component' => 'lime',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state) => match ($state) {
@@ -74,6 +77,8 @@ class ActivityResource extends Resource
                         'user' => 'Pengguna',
                         'component_type' => 'Tipe Komponen',
                         'salary_component' => 'Komponen Gaji',
+                        'payslip' => 'Slip Gaji',
+                        'payslip_component' => 'Komponen Slip Gaji',
                         default => 'Umum',
                     })
                     ->searchable()
@@ -111,23 +116,35 @@ class ActivityResource extends Resource
                     ->formatStateUsing(function ($state, $record) {
                         if (!$state) return '-';
                         
-                        if ($record->log_name === 'department' && $record->subject) {
-                            return $record->subject->name ?? '-';
-                        } elseif ($record->log_name === 'position' && $record->subject) {
-                            return $record->subject->title ?? '-';
-                        } elseif ($record->log_name === 'employee' && $record->subject) {
-                            $employee = $record->subject;
-                            return $employee->full_name ?? '-';
-                        } elseif ($record->log_name === 'component_type' && $record->subject) {
-                            return $record->subject->name ?? '-';
-                        } elseif ($record->log_name === 'salary_component' && $record->subject) {
-                            return $record->subject->name ?? '-';
+                        // Menggunakan accessor dari model Activity untuk menampilkan nama objek
+                        // daripada logika kompleks di dalam resource
+                        if ($record->subject) {
+                            return $record->subject->name ?? 
+                                $record->subject->title ?? 
+                                $record->subject->full_name ?? '-';
                         }
                         
-                        return $record->subject ? ($record->subject->name ?? ($record->subject->title ?? ($record->subject->full_name ?? '-'))) : '-';
+                        // Kalau tidak ada subject, coba gunakan model AuditLog
+                        if (class_exists('\\App\\Models\\AuditLog')) {
+                            $auditLog = new \App\Models\AuditLog();
+                            $auditLog->table_name = $record->log_name;
+                            $auditLog->record_id = $record->subject_id;
+                            return $auditLog->subject_name ?? '-';
+                        }
+                        
+                        return '-';
                     })
                     ->url(function ($record) {
-                        if (!$record || !$record->subject_id || !isset($record->subject_type)) return null;
+                        if (!$record || !$record->subject_id || !isset($record->subject_type)) {
+                            // Jika tidak ada subject, coba periksa dari model AuditLog
+                            if (class_exists('\\App\\Models\\AuditLog') && $record->log_name && $record->subject_id) {
+                                $auditLog = new \App\Models\AuditLog();
+                                $auditLog->table_name = $record->log_name;
+                                $auditLog->record_id = $record->subject_id;
+                                return $auditLog->subject_url;
+                            }
+                            return null;
+                        }
                         
                         return match($record->subject_type) {
                             'App\\Models\\Department' => DepartmentResource::getUrl('view', ['record' => $record->subject_id]),
@@ -135,6 +152,7 @@ class ActivityResource extends Resource
                             'App\\Models\\Employee' => EmployeeResource::getUrl('view', ['record' => $record->subject_id]),
                             'App\\Models\\ComponentType' => ComponentTypeResource::getUrl('view', ['record' => $record->subject_id]),
                             'App\\Models\\SalaryComponent' => SalaryComponentResource::getUrl('view', ['record' => $record->subject_id]),
+                            'App\\Models\\Payslip' => PayslipResource::getUrl('view', ['record' => $record->subject_id]),
                             default => null,
                         };
                     })
@@ -142,14 +160,16 @@ class ActivityResource extends Resource
                     ->toggleable()
                     ->searchable(query: function (Builder $query, string $search): Builder {
                         return $query->where(function (Builder $query) use ($search) {
-                            // Searching in both subject.name, subject.title, and subject.full_name depending on subject type
+                            // Mengurangi beban kueri dengan membatasi join
                             $query->whereHasMorph('subject', [
                                     'App\\Models\\Department', 
                                     'App\\Models\\Position', 
-                                    'App\\Models\\Employee', 
-                                    'App\\Models\\User',
+                                    'App\\Models\\Employee',
                                     'App\\Models\\ComponentType',
-                                    'App\\Models\\SalaryComponent'
+                                    'App\\Models\\SalaryComponent',
+                                    'App\\Models\\Payslip',
+                                    'App\\Models\\PayslipComponent',
+                                    'App\\Models\\User'
                                 ], function (Builder $query) use ($search) {
                                     $query->where(function (Builder $query) use ($search) {
                                         $query->where('name', 'like', "%{$search}%")
@@ -160,64 +180,6 @@ class ActivityResource extends Resource
                         });
                     })
                     ->tooltip('Klik untuk melihat detail objek'),
-                    
-                Tables\Columns\TextColumn::make('subject_type')
-                    ->label('Tipe')
-                    ->formatStateUsing(fn ($state) => $state ? Str::of($state)->afterLast('\\')->headline() : '-')
-                    ->toggleable()
-                    ->searchable(),
-                
-                // Kolom detail karyawan - hanya ditampilkan untuk log karyawan
-                Tables\Columns\TextColumn::make('employee_details')
-                    ->label('Detail Karyawan')
-                    ->getStateUsing(function ($record) {
-                        if (!$record || !$record->subject_type || $record->subject_type !== 'App\\Models\\Employee' || !$record->subject) {
-                            return null;
-                        }
-                        
-                        $employee = $record->subject;
-                        $details = [];
-                        
-                        if ($employee->nik) {
-                            $details[] = "NIK: " . $employee->nik;
-                        }
-                        
-                        if ($employee->department) {
-                            $details[] = "Departemen: " . $employee->department->name;
-                        }
-                        
-                        if ($employee->position) {
-                            $details[] = "Jabatan: " . $employee->position->title;
-                        }
-                        
-                        if ($employee->status) {
-                            $status = match($employee->status) {
-                                'active' => 'Aktif',
-                                'probation' => 'Masa Percobaan',
-                                'contract' => 'Kontrak',
-                                'inactive' => 'Tidak Aktif',
-                                'terminated' => 'Diberhentikan',
-                                default => $employee->status,
-                            };
-                            $details[] = "Status: " . $status;
-                        }
-                        
-                        return !empty($details) ? implode(' | ', $details) : null;
-                    })
-                    ->visible(fn ($record) => $record && $record->subject_type === 'App\\Models\\Employee')
-                    ->wrap()
-                    ->searchable(query: function (Builder $query, string $search): Builder {
-                        return $query->where('subject_type', 'App\\Models\\Employee')
-                            ->whereHasMorph('subject', ['App\\Models\\Employee'], function (Builder $query) use ($search) {
-                                $query->where('nik', 'like', "%{$search}%")
-                                    ->orWhereHas('department', function (Builder $query) use ($search) {
-                                        $query->where('name', 'like', "%{$search}%");
-                                    })
-                                    ->orWhereHas('position', function (Builder $query) use ($search) {
-                                        $query->where('title', 'like', "%{$search}%");
-                                    });
-                            });
-                    }),
                     
                 Tables\Columns\TextColumn::make('causer.name')
                     ->label('User')
@@ -237,6 +199,61 @@ class ActivityResource extends Resource
                     ->color('primary')
                     ->tooltip('Lihat perubahan')
                     ->toggleable()
+                    ->visible(fn ($record) => $record && $record->properties && !$record->properties->isEmpty())
+                    ->action(function ($record) {
+                        if (!$record || !$record->properties || $record->properties->isEmpty()) {
+                            return;
+                        }
+                        
+                        $changes = [];
+                        
+                        // Jika kita memiliki akses ke nilai lama dan baru
+                        if ($record->properties->has('old') && $record->properties->has('attributes')) {
+                            $oldValues = $record->properties->get('old');
+                            $newValues = $record->properties->get('attributes');
+                            
+                            // Ubah ID menjadi nama jika memungkinkan
+                            if (class_exists('\\App\\Models\\AuditLog')) {
+                                $auditLog = new \App\Models\AuditLog();
+                                $auditLog->table_name = $record->log_name;
+                                $auditLog->old_value = $oldValues;
+                                $auditLog->new_value = $newValues;
+                                
+                                $changeDescription = $auditLog->change_description;
+                                if ($changeDescription) {
+                                    $changes[] = $changeDescription;
+                                }
+                            } else {
+                                // Fallback jika AuditLog tidak tersedia
+                                foreach ($newValues as $key => $newValue) {
+                                    $oldValue = $oldValues[$key] ?? null;
+                                    if ($oldValue !== $newValue) {
+                                        $oldValueFormatted = is_array($oldValue) ? json_encode($oldValue) : (string)$oldValue;
+                                        $newValueFormatted = is_array($newValue) ? json_encode($newValue) : (string)$newValue;
+                                        $changes[] = ucfirst(str_replace('_', ' ', $key)) . ": {$oldValueFormatted} → {$newValueFormatted}";
+                                    }
+                                }
+                            }
+                        } else {
+                            // Tampilkan seluruh properties jika tidak bisa diurai
+                            $changes[] = json_encode($record->properties, JSON_PRETTY_PRINT);
+                        }
+                        
+                        if (empty($changes)) {
+                            $changes[] = 'Tidak ada detail perubahan.';
+                        }
+                        
+                        \Filament\Notifications\Notification::make()
+                            ->title('Detail Perubahan')
+                            ->body(implode("<br>", $changes))
+                            ->persistent()
+                            ->actions([
+                                \Filament\Notifications\Actions\Action::make('close')
+                                    ->label('Tutup')
+                                    ->color('gray')
+                            ])
+                            ->send();
+                    }),
             ])
             ->defaultSort('created_at', 'desc')
             ->persistFiltersInSession(false)
@@ -250,6 +267,8 @@ class ActivityResource extends Resource
                         'user' => 'Pengguna',
                         'component_type' => 'Tipe Komponen',
                         'salary_component' => 'Komponen Gaji',
+                        'payslip' => 'Slip Gaji',
+                        'payslip_component' => 'Komponen Slip Gaji',
                         'default' => 'Umum',
                     ])
                     ->multiple()
@@ -274,6 +293,8 @@ class ActivityResource extends Resource
                         'App\\Models\\User' => 'Pengguna',
                         'App\\Models\\ComponentType' => 'Tipe Komponen',
                         'App\\Models\\SalaryComponent' => 'Komponen Gaji',
+                        'App\\Models\\Payslip' => 'Slip Gaji',
+                        'App\\Models\\PayslipComponent' => 'Komponen Slip Gaji',
                     ])
                     ->multiple()
                     ->preload(),
@@ -288,8 +309,10 @@ class ActivityResource extends Resource
                                         ->from('activity_log')
                                         ->where('causer_type', 'App\\Models\\User')
                                         ->whereNotNull('causer_id')
-                                        ->distinct();
-                                })->pluck('name', 'id');
+                                        ->distinct()
+                                        ->limit(100); // Batasi jumlah pengguna yang diambil
+                                })
+                                ->pluck('name', 'id');
                             })
                             ->searchable()
                             ->multiple()
@@ -345,92 +368,6 @@ class ActivityResource extends Resource
 
                         return $indicators;
                     }),
-                    
-                Tables\Filters\Filter::make('employee_details')
-                    ->label('Filter Khusus Karyawan')
-                    ->form([
-                        Forms\Components\TextInput::make('employee_nik')
-                            ->label('NIK Karyawan')
-                            ->placeholder('Masukkan NIK'),
-                        Forms\Components\Select::make('department_id')
-                            ->label('Departemen Karyawan')
-                            ->options(function () {
-                                return \App\Models\Department::pluck('name', 'department_id');
-                            })
-                            ->searchable()
-                            ->preload()
-                            ->placeholder('Pilih departemen'),
-                        Forms\Components\Select::make('position_id')
-                            ->label('Jabatan Karyawan')
-                            ->options(function () {
-                                return \App\Models\Position::pluck('title', 'position_id');
-                            })
-                            ->searchable()
-                            ->preload()
-                            ->placeholder('Pilih jabatan'),
-                    ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        // Hanya menerapkan filter jika setidaknya satu nilai dipilih
-                        if (empty($data['employee_nik']) && empty($data['department_id']) && empty($data['position_id'])) {
-                            return $query; // Tidak menerapkan filter jika semua nilai kosong
-                        }
-                        
-                        return $query->whereNotNull('subject_type')
-                            ->where('subject_type', 'App\\Models\\Employee')
-                            ->when(
-                                $data['employee_nik'] ?? null,
-                                fn (Builder $query, $nik): Builder => $query
-                                    ->whereHasMorph('subject', ['App\\Models\\Employee'], function (Builder $query) use ($nik) {
-                                        $query->where('nik', 'like', "%{$nik}%");
-                                    })
-                            )
-                            ->when(
-                                $data['department_id'] ?? null,
-                                fn (Builder $query, $departmentId): Builder => $query
-                                    ->whereHasMorph('subject', ['App\\Models\\Employee'], function (Builder $query) use ($departmentId) {
-                                        $query->where('department_id', $departmentId);
-                                    })
-                            )
-                            ->when(
-                                $data['position_id'] ?? null,
-                                fn (Builder $query, $positionId): Builder => $query
-                                    ->whereHasMorph('subject', ['App\\Models\\Employee'], function (Builder $query) use ($positionId) {
-                                        $query->where('position_id', $positionId);
-                                    })
-                            );
-                    })
-                    ->indicateUsing(function (array $data): array {
-                        $indicators = [];
-                        
-                        // Tambahkan indicator bahwa ini filter khusus karyawan
-                        if (!empty($data['employee_nik']) || !empty($data['department_id']) || !empty($data['position_id'])) {
-                            $indicators['filter_type'] = 'Menampilkan khusus log karyawan';
-                        }
-
-                        if ($data['employee_nik'] ?? null) {
-                            $indicators['employee_nik'] = 'NIK: ' . $data['employee_nik'];
-                        }
-
-                        if ($data['department_id'] ?? null) {
-                            $department = \App\Models\Department::query()
-                                ->where('department_id', $data['department_id'])
-                                ->first();
-                            if ($department && $department->name) {
-                                $indicators['department_id'] = 'Departemen: ' . $department->name;
-                            }
-                        }
-
-                        if ($data['position_id'] ?? null) {
-                            $position = \App\Models\Position::query()
-                                ->where('position_id', $data['position_id'])
-                                ->first();
-                            if ($position && $position->title) {
-                                $indicators['position_id'] = 'Jabatan: ' . $position->title;
-                            }
-                        }
-
-                        return $indicators;
-                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()
@@ -457,48 +394,15 @@ class ActivityResource extends Resource
                             try {
                                 // Header kolom CSV
                                 $csvHeader = [
-                                    'ID', 'Jenis Log', 'Event', 'Deskripsi', 'Objek', 'Detail Karyawan', 'Oleh', 'Waktu'
+                                    'ID', 'Jenis Log', 'Event', 'Deskripsi', 'Objek', 'Oleh', 'Waktu'
                                 ];
                                 
-                                // Data untuk CSV
+                                // Data untuk CSV (disederhanakan)
                                 $csvData = $records->map(function ($record) {
                                     $objectName = '';
-                                    $employeeDetails = '';
                                     
                                     if ($record->subject) {
-                                        if ($record->log_name === 'department') {
-                                            $objectName = $record->subject->name ?? '';
-                                        } elseif ($record->log_name === 'position') {
-                                            $objectName = $record->subject->title ?? '';
-                                        } elseif ($record->log_name === 'employee' && isset($record->subject_type) && $record->subject_type === 'App\\Models\\Employee') {
-                                            $objectName = $record->subject->full_name ?? '';
-                                            
-                                            // Tambahkan detail karyawan
-                                            $details = [];
-                                            if ($record->subject->nik) {
-                                                $details[] = "NIK: " . $record->subject->nik;
-                                            }
-                                            if ($record->subject->department) {
-                                                $details[] = "Departemen: " . $record->subject->department->name;
-                                            }
-                                            if ($record->subject->position) {
-                                                $details[] = "Jabatan: " . $record->subject->position->title;
-                                            }
-                                            if ($record->subject->status) {
-                                                $status = match($record->subject->status) {
-                                                    'active' => 'Aktif',
-                                                    'probation' => 'Masa Percobaan',
-                                                    'contract' => 'Kontrak',
-                                                    'inactive' => 'Tidak Aktif',
-                                                    'terminated' => 'Diberhentikan',
-                                                    default => $record->subject->status,
-                                                };
-                                                $details[] = "Status: " . $status;
-                                            }
-                                            $employeeDetails = !empty($details) ? implode(' | ', $details) : '';
-                                        } else {
-                                            $objectName = $record->subject->name ?? ($record->subject->title ?? ($record->subject->full_name ?? ''));
-                                        }
+                                        $objectName = $record->subject->name ?? ($record->subject->title ?? ($record->subject->full_name ?? ''));
                                     }
                                     
                                     return [
@@ -507,7 +411,6 @@ class ActivityResource extends Resource
                                         $record->event ?? '',
                                         $record->description ?? '',
                                         $objectName,
-                                        $employeeDetails,
                                         $record->causer ? ($record->causer->name ?? '') : '',
                                         $record->created_at ? $record->created_at->format('d/m/Y H:i:s') : '',
                                     ];
@@ -550,7 +453,9 @@ class ActivityResource extends Resource
             ->emptyStateIcon('heroicon-o-clipboard-document-list')
             ->emptyStateHeading('Belum ada log aktivitas')
             ->emptyStateDescription('Log aktivitas akan tercatat saat ada perubahan data di sistem.')
-            ->poll('30s');
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
+            ->poll('60s'); // Memperlambat polling dari 30s ke 60s
     }
 
     public static function getRelations(): array
